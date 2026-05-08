@@ -166,6 +166,7 @@ impl ConfigurationRepository {
             "task" => "T",
             "adr" => "A",
             "specification" => "S",
+            "design" => "D",
             _ => {
                 return Err(crate::MetisError::ConfigurationError(
                     ConfigurationError::InvalidValue(format!(
@@ -317,5 +318,17 @@ mod tests {
 
         let deleted = repo.delete("nonexistent").unwrap();
         assert!(!deleted);
+    }
+
+    #[test]
+    fn test_generate_short_code_design() {
+        let mut repo = setup_test_repo();
+        repo.set_project_prefix("PREFIX").unwrap();
+
+        let first = repo.generate_short_code("design").unwrap();
+        assert_eq!(first, "PREFIX-D-0001");
+
+        let second = repo.generate_short_code("design").unwrap();
+        assert_eq!(second, "PREFIX-D-0002");
     }
 }

@@ -58,9 +58,10 @@ impl ListDocumentsTool {
             let type_order_map: HashMap<&str, usize> = [
                 ("vision", 0),
                 ("specification", 1),
-                ("initiative", 2),
-                ("task", 3),
-                ("adr", 4),
+                ("design", 2),
+                ("initiative", 3),
+                ("task", 4),
+                ("adr", 5),
             ]
             .into_iter()
             .collect();
@@ -100,7 +101,7 @@ impl ListDocumentsTool {
         let mut all_docs = Vec::new();
 
         // Collect all document types
-        for doc_type in ["vision", "initiative", "task", "adr", "specification"] {
+        for doc_type in ["vision", "initiative", "task", "adr", "specification", "design"] {
             let mut docs = if include_archived {
                 repo.find_by_type(doc_type)
             } else {

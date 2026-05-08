@@ -14,6 +14,7 @@ Metis organizes work hierarchically using Flight Levels methodology: Vision (str
 | **Backlog** | Standalone bugs/features/debt | backlog → todo → active → completed | No (use `backlog_category`) |
 | **ADR** | Architecture decisions | draft → discussion → decided → superseded | No |
 | **Specification** | System/feature specs (living docs) | discovery → drafting → review → published | Vision or Initiative |
+| **Design** | UI/UX designs (peer of Initiative) | discovery → review → approved | Vision (any phase) |
 
 **Note**: Configuration may disable some document types. The current project shows enabled types in tool responses.
 
@@ -55,6 +56,12 @@ Metis organizes work hierarchically using Flight Levels methodology: Vision (str
 - review → published
 - published → (terminal, but content remains editable as a living document)
 
+**Design**: `discovery → review → approved`
+- discovery → review
+- review → approved (forward path: design is approved for implementation)
+- review → discovery (kick-back: reviewers can send a design back for rework)
+- approved → (terminal, except archive)
+
 ### What This Means
 
 - **Cannot skip phases**: A task in "todo" cannot go directly to "completed" - it must go through "active" first
@@ -65,7 +72,7 @@ Metis organizes work hierarchically using Flight Levels methodology: Vision (str
 ## Short Codes
 
 All documents get unique IDs: `PREFIX-TYPE-NNNN` (e.g., `PROJ-V-0001`, `ACME-T-0042`)
-- **V**=Vision, **S**=Specification, **I**=Initiative, **T**=Task, **A**=ADR
+- **V**=Vision, **S**=Specification, **I**=Initiative, **T**=Task, **A**=ADR, **D**=Design
 - Use short codes to reference documents in all operations
 
 ## CRITICAL: project_path Format
@@ -98,7 +105,7 @@ Full-text search across documents.
 ```
 project_path: string (required) - Path to the .metis folder (e.g., "/path/to/project/.metis")
 query: string (required) - Search text
-document_type: string (optional) - Filter: vision, initiative, task, adr, specification
+document_type: string (optional) - Filter: vision, initiative, task, adr, specification, design
 limit: number (optional) - Max results
 include_archived: bool (optional) - Include archived docs (default: false)
 ```
@@ -114,9 +121,9 @@ short_code: string (required) - Document ID (e.g., PROJ-I-0001)
 Create a new document.
 ```
 project_path: string (required) - Path to the .metis folder (e.g., "/path/to/project/.metis")
-document_type: string (required) - vision, initiative, task, adr, specification
+document_type: string (required) - vision, initiative, task, adr, specification, design
 title: string (required) - Document title
-parent_id: string (optional) - Parent short code (required for initiative/task/specification)
+parent_id: string (optional) - Parent short code (required for initiative/task/specification/design)
 complexity: string (optional) - For initiatives: xs, s, m, l, xl
 decision_maker: string (optional) - For ADRs
 backlog_category: string (optional) - For backlog items: bug, feature, tech-debt
@@ -204,6 +211,18 @@ create_document:
 1. Transition initiative to "decompose" phase
 2. Create tasks with parent_id pointing to the initiative
 3. Transition initiative to "active" when ready to execute
+
+### Capturing UI Designs
+Designs live alongside initiatives, parented to the vision. Capture all UI design work as design documents — initiatives are not required.
+
+```
+create_document:
+  document_type: "design"
+  title: "Onboarding flow v2"
+  parent_id: "PROJ-V-0001"
+```
+
+Designs flow through `discovery → review → approved`. Use `transition_phase` with `phase: "discovery"` from review to send a design back for rework. Scratched designs are archived via `archive_document` from any phase.
 
 ### Assigning Backlog Items to Initiatives
 To move a standalone backlog item into an initiative:

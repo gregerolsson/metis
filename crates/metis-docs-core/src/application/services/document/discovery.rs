@@ -2,7 +2,7 @@ use crate::application::services::DatabaseService;
 use crate::domain::documents::traits::Document;
 use crate::domain::documents::types::DocumentType;
 use crate::Result;
-use crate::{Adr, Initiative, MetisError, Specification, Task, Vision};
+use crate::{Adr, Design, Initiative, MetisError, Specification, Task, Vision};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
@@ -70,6 +70,7 @@ impl DocumentDiscoveryService {
             DocumentType::Initiative,
             DocumentType::Task,
             DocumentType::Adr,
+            DocumentType::Design,
         ] {
             if let Ok(file_path) = self.find_document_of_type(document_id, doc_type).await {
                 return Ok(DocumentDiscoveryResult {
@@ -257,6 +258,37 @@ impl DocumentDiscoveryService {
                     "Specification document not found".to_string(),
                 ))
             }
+
+            DocumentType::Design => {
+                let designs_dir = self.workspace_dir.join("designs");
+                if !designs_dir.exists() {
+                    return Err(MetisError::NotFound(
+                        "No designs directory found".to_string(),
+                    ));
+                }
+
+                for entry in fs::read_dir(&designs_dir)
+                    .map_err(|e| MetisError::FileSystem(e.to_string()))?
+                {
+                    let entry_path = entry
+                        .map_err(|e| MetisError::FileSystem(e.to_string()))?
+                        .path();
+                    // Each design lives in its own directory: designs/{SHORT_CODE}/design.md
+                    if entry_path.is_dir() {
+                        let design_path = entry_path.join("design.md");
+                        if design_path.exists() {
+                            if let Ok(design) = Design::from_file(&design_path).await {
+                                if design.id().to_string() == document_id {
+                                    return Ok(design_path);
+                                }
+                            }
+                        }
+                    }
+                }
+                Err(MetisError::NotFound(
+                    "Design document not found".to_string(),
+                ))
+            }
         }
     }
 
@@ -375,6 +407,25 @@ impl DocumentDiscoveryService {
                     }
                 }
             }
+
+            DocumentType::Design => {
+                let designs_dir = self.workspace_dir.join("designs");
+                if designs_dir.exists() {
+                    for entry in fs::read_dir(&designs_dir)
+                        .map_err(|e| MetisError::FileSystem(e.to_string()))?
+                    {
+                        let entry_path = entry
+                            .map_err(|e| MetisError::FileSystem(e.to_string()))?
+                            .path();
+                        if entry_path.is_dir() {
+                            let design_path = entry_path.join("design.md");
+                            if design_path.exists() {
+                                documents.push(design_path);
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         Ok(documents)
@@ -471,6 +522,7 @@ impl DocumentDiscoveryService {
             "T" => Ok(DocumentType::Task),
             "A" => Ok(DocumentType::Adr),
             "S" => Ok(DocumentType::Specification),
+            "D" => Ok(DocumentType::Design),
             _ => Err(MetisError::ValidationFailed {
                 message: format!(
                     "Unknown document type code: '{}' in short code '{}'",
@@ -507,6 +559,11 @@ impl DocumentDiscoveryService {
                 .join("specifications")
                 .join(short_code)
                 .join("specification.md")),
+            DocumentType::Design => Ok(self
+                .workspace_dir
+                .join("designs")
+                .join(short_code)
+                .join("design.md")),
         }
     }
 

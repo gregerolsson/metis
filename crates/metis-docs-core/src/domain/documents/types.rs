@@ -156,6 +156,7 @@ pub enum DocumentType {
     Task,
     Adr,
     Specification,
+    Design,
 }
 
 impl fmt::Display for DocumentType {
@@ -166,6 +167,7 @@ impl fmt::Display for DocumentType {
             DocumentType::Task => write!(f, "task"),
             DocumentType::Adr => write!(f, "adr"),
             DocumentType::Specification => write!(f, "specification"),
+            DocumentType::Design => write!(f, "design"),
         }
     }
 }
@@ -180,6 +182,7 @@ impl FromStr for DocumentType {
             "task" => Ok(DocumentType::Task),
             "adr" => Ok(DocumentType::Adr),
             "specification" => Ok(DocumentType::Specification),
+            "design" => Ok(DocumentType::Design),
             _ => Err(format!("Unknown document type: {}", s)),
         }
     }
@@ -223,6 +226,11 @@ impl DocumentType {
                 Phase::Review => vec![Phase::Published],
                 _ => vec![],
             },
+            DocumentType::Design => match from_phase {
+                Phase::Discovery => vec![Phase::Review],
+                Phase::Review => vec![Phase::Approved, Phase::Discovery],
+                _ => vec![],
+            },
         }
     }
 
@@ -264,6 +272,7 @@ impl DocumentType {
                 Phase::Review,
                 Phase::Published,
             ],
+            DocumentType::Design => vec![Phase::Discovery, Phase::Review, Phase::Approved],
         }
     }
 }
@@ -288,11 +297,12 @@ pub enum Phase {
     Blocked,
     Completed,
 
-    // Initiative phases
+    // Initiative / Design phases
     Design,
     Ready,
     Decompose,
     Discovery,
+    Approved,
 
     // Specification phases
     Drafting,
@@ -316,6 +326,7 @@ impl fmt::Display for Phase {
             Phase::Ready => write!(f, "ready"),
             Phase::Decompose => write!(f, "decompose"),
             Phase::Discovery => write!(f, "discovery"),
+            Phase::Approved => write!(f, "approved"),
             Phase::Drafting => write!(f, "drafting"),
         }
     }
@@ -382,6 +393,7 @@ impl std::str::FromStr for Tag {
                 "ready" => Ok(Tag::Phase(Phase::Ready)),
                 "decompose" => Ok(Tag::Phase(Phase::Decompose)),
                 "discovery" => Ok(Tag::Phase(Phase::Discovery)),
+                "approved" => Ok(Tag::Phase(Phase::Approved)),
                 "backlog" => Ok(Tag::Phase(Phase::Backlog)),
                 "drafting" => Ok(Tag::Phase(Phase::Drafting)),
                 _ => Err(()), // Unknown phase
@@ -568,6 +580,59 @@ mod tests {
             DocumentType::Task.next_phase(Phase::Blocked),
             Some(Phase::Todo) // First valid transition
         );
+    }
+
+    #[test]
+    fn test_document_type_design_transitions() {
+        assert_eq!(
+            DocumentType::Design.valid_transitions_from(Phase::Discovery),
+            vec![Phase::Review]
+        );
+        assert_eq!(
+            DocumentType::Design.valid_transitions_from(Phase::Review),
+            vec![Phase::Approved, Phase::Discovery]
+        );
+        assert!(DocumentType::Design
+            .valid_transitions_from(Phase::Approved)
+            .is_empty());
+
+        // Forward path
+        assert!(DocumentType::Design.can_transition(Phase::Discovery, Phase::Review));
+        assert!(DocumentType::Design.can_transition(Phase::Review, Phase::Approved));
+
+        // Kick-back
+        assert!(DocumentType::Design.can_transition(Phase::Review, Phase::Discovery));
+
+        // Cannot skip Review
+        assert!(!DocumentType::Design.can_transition(Phase::Discovery, Phase::Approved));
+
+        // Approved is terminal
+        assert!(!DocumentType::Design.can_transition(Phase::Approved, Phase::Discovery));
+        assert!(!DocumentType::Design.can_transition(Phase::Approved, Phase::Review));
+    }
+
+    #[test]
+    fn test_document_type_design_phase_sequence() {
+        assert_eq!(
+            DocumentType::Design.phase_sequence(),
+            vec![Phase::Discovery, Phase::Review, Phase::Approved]
+        );
+    }
+
+    #[test]
+    fn test_document_type_design_from_str() {
+        assert_eq!(
+            DocumentType::from_str("design").unwrap(),
+            DocumentType::Design
+        );
+        assert_eq!(DocumentType::Design.to_string(), "design");
+    }
+
+    #[test]
+    fn test_phase_approved_tag_roundtrip() {
+        let tag: Tag = "#phase/approved".parse().unwrap();
+        assert_eq!(tag, Tag::Phase(Phase::Approved));
+        assert_eq!(tag.to_str(), "#phase/approved");
     }
 
     #[test]

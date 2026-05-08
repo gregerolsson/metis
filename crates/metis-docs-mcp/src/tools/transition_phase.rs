@@ -111,6 +111,7 @@ impl TransitionPhaseTool {
             "ready" => Ok(Phase::Ready),
             "decompose" => Ok(Phase::Decompose),
             "discovery" => Ok(Phase::Discovery),
+            "approved" => Ok(Phase::Approved),
             "drafting" => Ok(Phase::Drafting),
             _ => Err(CallToolError::new(std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
@@ -191,6 +192,17 @@ impl TransitionPhaseTool {
                 "**Published**: This specification is the authoritative reference. It remains a living document — update it as the system evolves, but changes should be reviewed."
             ),
 
+            // Design phases
+            ("design", "discovery") => Some(
+                "**Discovery phase**: Frame the design problem, identify the target user, and gather supporting research. Link to mockups, .pen files, screenshots, or Figma URLs as you produce them."
+            ),
+            ("design", "review") => Some(
+                "**Review phase**: The design is ready for review. Reviewers can either approve (forward to `approved`) or kick the design back to `discovery` for rework."
+            ),
+            ("design", "approved") => Some(
+                "**Approved**: This design is approved for implementation. Reference it from initiatives or tasks by short code. Update Implementation References as work is scheduled."
+            ),
+
             _ => None,
         }
     }
@@ -203,6 +215,7 @@ impl TransitionPhaseTool {
             "task" => Some(DocumentType::Task),
             "adr" => Some(DocumentType::Adr),
             "specification" => Some(DocumentType::Specification),
+            "design" => Some(DocumentType::Design),
             _ => None,
         };
 

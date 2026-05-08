@@ -2,7 +2,7 @@ use crate::application::services::document::DocumentDiscoveryService;
 use crate::domain::documents::traits::Document;
 use crate::domain::documents::types::{DocumentType, Phase};
 use crate::Result;
-use crate::{Adr, Initiative, MetisError, Specification, Task, Vision};
+use crate::{Adr, Design, Initiative, MetisError, Specification, Task, Vision};
 use std::path::{Path, PathBuf};
 
 /// Service for managing document phase transitions
@@ -132,6 +132,12 @@ impl PhaseTransitionService {
                     .map_err(|e| MetisError::InvalidDocument(e.to_string()))?;
                 Ok(spec.phase()?)
             }
+            DocumentType::Design => {
+                let design = Design::from_file(file_path)
+                    .await
+                    .map_err(|e| MetisError::InvalidDocument(e.to_string()))?;
+                Ok(design.phase()?)
+            }
         }
     }
 
@@ -217,6 +223,22 @@ impl PhaseTransitionService {
                     }
                 })?;
                 spec.to_file(file_path)
+                    .await
+                    .map_err(|e| MetisError::InvalidDocument(e.to_string()))?;
+            }
+            DocumentType::Design => {
+                let mut design = Design::from_file(file_path)
+                    .await
+                    .map_err(|e| MetisError::InvalidDocument(e.to_string()))?;
+                design.transition_phase(Some(target_phase)).map_err(|_e| {
+                    MetisError::InvalidPhaseTransition {
+                        from: design.phase().unwrap_or(Phase::Discovery).to_string(),
+                        to: target_phase.to_string(),
+                        doc_type: "design".to_string(),
+                    }
+                })?;
+                design
+                    .to_file(file_path)
                     .await
                     .map_err(|e| MetisError::InvalidDocument(e.to_string()))?;
             }
@@ -420,6 +442,58 @@ mod tests {
         let task_blocked_transitions =
             transition_service.get_valid_transitions_for(DocumentType::Task, Phase::Blocked);
         assert_eq!(task_blocked_transitions, vec![Phase::Todo, Phase::Active]);
+    }
+
+    #[tokio::test]
+    async fn test_design_kickback_review_to_discovery() {
+        let (_temp_dir, workspace_dir) = setup_test_workspace().await;
+
+        // Create a vision and sync to DB so the design's parent lookup works
+        let creation_service = DocumentCreationService::new(&workspace_dir);
+        let vision_config = DocumentCreationConfig {
+            title: "Test Vision".to_string(),
+            description: None,
+            parent_id: None,
+            tags: vec![],
+            phase: None,
+            complexity: None,
+        };
+        let vision_result = creation_service.create_vision(vision_config).await.unwrap();
+
+        let db = Database::new(&workspace_dir.join("metis.db").to_string_lossy()).unwrap();
+        let mut db_service =
+            crate::application::services::DatabaseService::new(db.into_repository());
+        let mut sync_service = crate::application::services::SyncService::new(&mut db_service)
+            .with_workspace_dir(&workspace_dir);
+        sync_service.sync_directory(&workspace_dir).await.unwrap();
+
+        // Create a design under the vision
+        let design_config = DocumentCreationConfig {
+            title: "Test Design".to_string(),
+            description: None,
+            parent_id: Some(crate::DocumentId::from(vision_result.short_code.as_str())),
+            tags: vec![],
+            phase: None,
+            complexity: None,
+        };
+        let design_result = creation_service.create_design(design_config).await.unwrap();
+
+        let transition_service = PhaseTransitionService::new(&workspace_dir);
+
+        // Move design to Review
+        let review = transition_service
+            .transition_document(&design_result.short_code, Phase::Review)
+            .await
+            .unwrap();
+        assert_eq!(review.to_phase, Phase::Review);
+
+        // Kick-back: explicit transition Review -> Discovery
+        let kickback = transition_service
+            .transition_document(&design_result.short_code, Phase::Discovery)
+            .await
+            .unwrap();
+        assert_eq!(kickback.from_phase, Phase::Review);
+        assert_eq!(kickback.to_phase, Phase::Discovery);
     }
 
     #[tokio::test]

@@ -15,6 +15,7 @@ pub use application::Application;
 pub use dal::Database;
 pub use domain::documents::{
     adr::Adr,
+    design::Design,
     initiative::{Complexity, Initiative},
     specification::Specification,
     task::Task,

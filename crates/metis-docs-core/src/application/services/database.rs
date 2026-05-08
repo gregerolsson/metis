@@ -117,6 +117,7 @@ impl DatabaseService {
             DocumentType::Initiative,
             DocumentType::Task,
             DocumentType::Adr,
+            DocumentType::Design,
         ] {
             let docs = self.repository.find_by_type(&doc_type.to_string())?;
             for doc in docs {

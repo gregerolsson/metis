@@ -42,7 +42,10 @@ impl FlightLevelConfig {
     /// Check if a document type is allowed in this configuration
     pub fn is_document_type_allowed(&self, doc_type: DocumentType) -> bool {
         match doc_type {
-            DocumentType::Vision | DocumentType::Adr | DocumentType::Specification => true, // Always allowed
+            DocumentType::Vision
+            | DocumentType::Adr
+            | DocumentType::Specification
+            | DocumentType::Design => true, // Always allowed
             DocumentType::Task => true, // Always allowed
             DocumentType::Initiative => self.initiatives_enabled,
         }
@@ -54,6 +57,7 @@ impl FlightLevelConfig {
             DocumentType::Vision | DocumentType::Adr => None, // Top level documents
             DocumentType::Specification => None, // Attached document (parent set explicitly)
             DocumentType::Initiative => Some(DocumentType::Vision),
+            DocumentType::Design => Some(DocumentType::Vision),
             DocumentType::Task => {
                 if self.initiatives_enabled {
                     Some(DocumentType::Initiative)
@@ -84,6 +88,7 @@ impl FlightLevelConfig {
         types.push(DocumentType::Task);
         types.push(DocumentType::Adr); // ADRs are always available
         types.push(DocumentType::Specification); // Specifications are always available
+        types.push(DocumentType::Design); // Designs are always available
 
         types
     }
@@ -297,12 +302,14 @@ mod tests {
         assert!(streamlined.is_document_type_allowed(DocumentType::Initiative));
         assert!(streamlined.is_document_type_allowed(DocumentType::Task));
         assert!(streamlined.is_document_type_allowed(DocumentType::Adr));
+        assert!(streamlined.is_document_type_allowed(DocumentType::Design));
 
         let direct = FlightLevelConfig::direct();
         assert!(direct.is_document_type_allowed(DocumentType::Vision));
         assert!(!direct.is_document_type_allowed(DocumentType::Initiative));
         assert!(direct.is_document_type_allowed(DocumentType::Task));
         assert!(direct.is_document_type_allowed(DocumentType::Adr));
+        assert!(direct.is_document_type_allowed(DocumentType::Design));
     }
 
     #[test]
@@ -318,10 +325,18 @@ mod tests {
             Some(DocumentType::Initiative)
         );
         assert_eq!(streamlined.get_parent_type(DocumentType::Adr), None);
+        assert_eq!(
+            streamlined.get_parent_type(DocumentType::Design),
+            Some(DocumentType::Vision)
+        );
 
         let direct = FlightLevelConfig::direct();
         assert_eq!(
             direct.get_parent_type(DocumentType::Task),
+            Some(DocumentType::Vision)
+        );
+        assert_eq!(
+            direct.get_parent_type(DocumentType::Design),
             Some(DocumentType::Vision)
         );
     }
@@ -337,7 +352,8 @@ mod tests {
                 DocumentType::Initiative,
                 DocumentType::Task,
                 DocumentType::Adr,
-                DocumentType::Specification
+                DocumentType::Specification,
+                DocumentType::Design,
             ]
         );
 
@@ -349,7 +365,8 @@ mod tests {
                 DocumentType::Vision,
                 DocumentType::Task,
                 DocumentType::Adr,
-                DocumentType::Specification
+                DocumentType::Specification,
+                DocumentType::Design,
             ]
         );
     }

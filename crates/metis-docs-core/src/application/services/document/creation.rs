@@ -5,7 +5,7 @@ use crate::domain::documents::initiative::Complexity;
 use crate::domain::documents::traits::Document;
 use crate::domain::documents::types::{DocumentId, DocumentType, ParentReference, Phase, Tag};
 use crate::Result;
-use crate::{Adr, Database, Initiative, MetisError, Specification, Task, Vision};
+use crate::{Adr, Database, Design, Initiative, MetisError, Specification, Task, Vision};
 use diesel::{sqlite::SqliteConnection, Connection};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -582,6 +582,89 @@ impl DocumentCreationService {
         })
     }
 
+    /// Create a new design document. Requires a Vision parent.
+    pub async fn create_design(
+        &self,
+        config: DocumentCreationConfig,
+    ) -> Result<CreationResult> {
+        let parent_id = config
+            .parent_id
+            .clone()
+            .ok_or_else(|| MetisError::ValidationFailed {
+                message: "Design requires a Vision parent. Provide parent_id with a Vision short code.".to_string(),
+            })?;
+
+        // Validate the parent is actually a Vision by looking it up in the DB
+        let db_path = self.workspace_dir.join("metis.db");
+        let db = Database::new(db_path.to_str().unwrap())
+            .map_err(|e| MetisError::FileSystem(format!("Database error: {}", e)))?;
+        let mut repo = db
+            .repository()
+            .map_err(|e| MetisError::FileSystem(format!("Repository error: {}", e)))?;
+
+        let parent_doc = repo
+            .find_by_short_code(parent_id.as_str())
+            .map_err(|e| MetisError::FileSystem(format!("Database lookup error: {}", e)))?
+            .ok_or_else(|| {
+                MetisError::NotFound(format!("Parent vision '{}' not found", parent_id.as_str()))
+            })?;
+
+        if parent_doc.document_type != "vision" {
+            return Err(MetisError::ValidationFailed {
+                message: format!(
+                    "Design parent must be a Vision (got {}). Designs cannot be parented to {}.",
+                    parent_doc.document_type, parent_doc.document_type
+                ),
+            });
+        }
+
+        // Generate short code
+        let short_code = self.generate_short_code("design")?;
+        let designs_dir = self.workspace_dir.join("designs").join(&short_code);
+        let file_path = designs_dir.join("design.md");
+
+        if file_path.exists() {
+            return Err(MetisError::ValidationFailed {
+                message: format!("Design with short code '{}' already exists", short_code),
+            });
+        }
+
+        let template_content = self
+            .template_loader
+            .load_content_template("design")
+            .map_err(|e| MetisError::InvalidDocument(e.to_string()))?;
+
+        let mut tags = vec![
+            Tag::Label("design".to_string()),
+            Tag::Phase(config.phase.unwrap_or(Phase::Discovery)),
+        ];
+        tags.extend(config.tags);
+
+        let design = Design::new_with_template(
+            config.title.clone(),
+            parent_id,
+            tags,
+            false,
+            short_code.clone(),
+            &template_content,
+        )
+        .map_err(|e| MetisError::InvalidDocument(e.to_string()))?;
+
+        fs::create_dir_all(&designs_dir).map_err(|e| MetisError::FileSystem(e.to_string()))?;
+
+        design
+            .to_file(&file_path)
+            .await
+            .map_err(|e| MetisError::InvalidDocument(e.to_string()))?;
+
+        Ok(CreationResult {
+            document_id: design.id(),
+            document_type: DocumentType::Design,
+            file_path,
+            short_code,
+        })
+    }
+
     /// Get the next ADR number by examining existing ADRs
     fn get_next_adr_number(&self) -> Result<u32> {
         let adrs_dir = self.workspace_dir.join("adrs");
@@ -991,6 +1074,188 @@ This is a custom template for testing.
             content.contains("Fallback Vision"),
             "Should contain the title"
         );
+    }
+
+    #[tokio::test]
+    async fn test_create_design_under_vision() {
+        let (service, _temp) = setup_test_service_temp();
+
+        // Create a vision first so the parent lookup succeeds
+        let vision_config = DocumentCreationConfig {
+            title: "Test Vision".to_string(),
+            description: None,
+            parent_id: None,
+            tags: vec![],
+            phase: None,
+            complexity: None,
+        };
+        let vision_result = service.create_vision(vision_config).await.unwrap();
+
+        // Sync the vision to the database
+        let mut db_service = crate::application::services::DatabaseService::new(
+            crate::Database::new(&service.db_path.to_string_lossy())
+                .unwrap()
+                .into_repository(),
+        );
+        let mut sync_service = crate::application::services::SyncService::new(&mut db_service)
+            .with_workspace_dir(&service.workspace_dir);
+        sync_service
+            .sync_directory(&service.workspace_dir)
+            .await
+            .unwrap();
+
+        // Create a design parented to that vision
+        let design_config = DocumentCreationConfig {
+            title: "My Design".to_string(),
+            description: None,
+            parent_id: Some(DocumentId::from(vision_result.short_code.as_str())),
+            tags: vec![],
+            phase: None,
+            complexity: None,
+        };
+
+        let result = service.create_design(design_config).await.unwrap();
+
+        assert_eq!(result.document_type, DocumentType::Design);
+        assert!(result.file_path.exists());
+        assert!(result
+            .file_path
+            .to_string_lossy()
+            .contains("designs"));
+        assert!(result
+            .file_path
+            .to_string_lossy()
+            .ends_with("design.md"));
+        assert!(result.short_code.contains("-D-"));
+
+        // Verify defaults
+        let design = Design::from_file(&result.file_path).await.unwrap();
+        assert_eq!(design.phase().unwrap(), Phase::Discovery);
+        assert!(design
+            .tags()
+            .iter()
+            .any(|t| matches!(t, Tag::Label(l) if l == "design")));
+        assert_eq!(
+            design.parent_id().unwrap().to_string(),
+            vision_result.short_code
+        );
+    }
+
+    #[tokio::test]
+    async fn test_create_design_without_parent_fails() {
+        let (service, _temp) = setup_test_service_temp();
+
+        let config = DocumentCreationConfig {
+            title: "Orphan Design".to_string(),
+            description: None,
+            parent_id: None,
+            tags: vec![],
+            phase: None,
+            complexity: None,
+        };
+
+        let result = service.create_design(config).await;
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(
+            msg.contains("Design requires a Vision parent"),
+            "Unexpected error: {}",
+            msg
+        );
+    }
+
+    #[tokio::test]
+    async fn test_create_design_with_initiative_parent_fails() {
+        let (service, _temp) = setup_test_service_temp();
+        let flight_config = FlightLevelConfig::streamlined();
+
+        // Create initiative
+        let init_config = DocumentCreationConfig {
+            title: "An Initiative".to_string(),
+            description: None,
+            parent_id: None,
+            tags: vec![],
+            phase: None,
+            complexity: None,
+        };
+        let init_result = service
+            .create_initiative_with_config(init_config, &flight_config)
+            .await
+            .unwrap();
+
+        // Sync DB
+        let mut db_service = crate::application::services::DatabaseService::new(
+            crate::Database::new(&service.db_path.to_string_lossy())
+                .unwrap()
+                .into_repository(),
+        );
+        let mut sync_service = crate::application::services::SyncService::new(&mut db_service)
+            .with_workspace_dir(&service.workspace_dir);
+        sync_service
+            .sync_directory(&service.workspace_dir)
+            .await
+            .unwrap();
+
+        // Now try to create design parented to that initiative — should fail
+        let design_config = DocumentCreationConfig {
+            title: "Bad Parent Design".to_string(),
+            description: None,
+            parent_id: Some(DocumentId::from(init_result.short_code.as_str())),
+            tags: vec![],
+            phase: None,
+            complexity: None,
+        };
+
+        let result = service.create_design(design_config).await;
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(
+            msg.contains("Design parent must be a Vision"),
+            "Unexpected error: {}",
+            msg
+        );
+    }
+
+    #[tokio::test]
+    async fn test_create_design_in_direct_preset() {
+        // Designs are always enabled. The direct preset doesn't change that.
+        let (service, _temp) = setup_test_service_temp();
+
+        // Create vision in direct preset (vision is also always allowed)
+        let vision_config = DocumentCreationConfig {
+            title: "Direct Vision".to_string(),
+            description: None,
+            parent_id: None,
+            tags: vec![],
+            phase: None,
+            complexity: None,
+        };
+        let vision_result = service.create_vision(vision_config).await.unwrap();
+
+        // Sync DB
+        let mut db_service = crate::application::services::DatabaseService::new(
+            crate::Database::new(&service.db_path.to_string_lossy())
+                .unwrap()
+                .into_repository(),
+        );
+        let mut sync_service = crate::application::services::SyncService::new(&mut db_service)
+            .with_workspace_dir(&service.workspace_dir);
+        sync_service
+            .sync_directory(&service.workspace_dir)
+            .await
+            .unwrap();
+
+        let design_config = DocumentCreationConfig {
+            title: "Direct Preset Design".to_string(),
+            description: None,
+            parent_id: Some(DocumentId::from(vision_result.short_code.as_str())),
+            tags: vec![],
+            phase: None,
+            complexity: None,
+        };
+
+        let result = service.create_design(design_config).await.unwrap();
+        assert_eq!(result.document_type, DocumentType::Design);
     }
 
     #[tokio::test]

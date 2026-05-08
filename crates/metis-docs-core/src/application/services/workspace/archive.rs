@@ -3,7 +3,7 @@ use crate::application::services::DatabaseService;
 use crate::domain::documents::traits::Document;
 use crate::domain::documents::types::DocumentType;
 use crate::Result;
-use crate::{Adr, Initiative, MetisError, Specification, Task, Vision};
+use crate::{Adr, Design, Initiative, MetisError, Specification, Task, Vision};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
@@ -87,6 +87,16 @@ impl ArchiveService {
                     .await
                     .map_err(|e| MetisError::InvalidDocument(e.to_string()))?;
             }
+            DocumentType::Design => {
+                let mut design = Design::from_file(file_path)
+                    .await
+                    .map_err(|e| MetisError::InvalidDocument(e.to_string()))?;
+                design.core_mut().archived = true;
+                design
+                    .to_file(file_path)
+                    .await
+                    .map_err(|e| MetisError::InvalidDocument(e.to_string()))?;
+            }
         }
         Ok(())
     }
@@ -140,7 +150,8 @@ impl ArchiveService {
             DocumentType::Vision
             | DocumentType::Task
             | DocumentType::Adr
-            | DocumentType::Specification => {
+            | DocumentType::Specification
+            | DocumentType::Design => {
                 // These document types don't have children, just archive the file
                 // Convert relative path from DB to absolute path for filesystem operations
                 let absolute_path = self.workspace_dir.join(&doc.filepath);
@@ -370,6 +381,12 @@ impl ArchiveService {
                     .map_err(|e| MetisError::InvalidDocument(e.to_string()))?;
                 Ok(spec.id().to_string())
             }
+            DocumentType::Design => {
+                let design = Design::from_file(file_path)
+                    .await
+                    .map_err(|e| MetisError::InvalidDocument(e.to_string()))?;
+                Ok(design.id().to_string())
+            }
         }
     }
 
@@ -466,6 +483,9 @@ impl ArchiveService {
         if Specification::from_file(file_path).await.is_ok() {
             return Ok(DocumentType::Specification);
         }
+        if Design::from_file(file_path).await.is_ok() {
+            return Ok(DocumentType::Design);
+        }
 
         Err(MetisError::InvalidDocument(
             "Could not determine document type".to_string(),
@@ -496,7 +516,8 @@ impl ArchiveService {
             DocumentType::Vision
             | DocumentType::Task
             | DocumentType::Adr
-            | DocumentType::Specification => {
+            | DocumentType::Specification
+            | DocumentType::Design => {
                 // These document types don't have children, just archive the file
                 // Convert relative path from DB to absolute path for filesystem operations
                 let absolute_path = self.workspace_dir.join(&doc.filepath);

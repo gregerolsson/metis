@@ -8,6 +8,7 @@ pub mod types;
 
 // Document type implementations
 pub mod adr;
+pub mod design;
 pub mod initiative;
 pub mod specification;
 pub mod task;

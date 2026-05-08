@@ -1,0 +1,17 @@
+id: {{ slug }}
+level: design
+title: "{{ title }}"
+short_code: "{{ short_code }}"
+created_at: {{ created_at }}
+updated_at: {{ updated_at }}
+parent: {{ parent_id }}
+blocked_by: []
+
+# Phase progression for Designs
+tags:
+  - "#design"
+  - "#phase/discovery"
+  # - "#phase/review"
+  # - "#phase/approved"
+
+exit_criteria_met: false

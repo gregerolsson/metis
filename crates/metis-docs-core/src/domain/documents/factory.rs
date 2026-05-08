@@ -1,5 +1,6 @@
 use super::{
     adr::Adr,
+    design::Design,
     initiative::Initiative,
     specification::Specification,
     task::Task,
@@ -49,6 +50,10 @@ impl DocumentFactory {
                 let spec = Specification::from_file(path).await?;
                 Ok(Box::new(spec))
             }
+            DocumentType::Design => {
+                let design = Design::from_file(path).await?;
+                Ok(Box::new(design))
+            }
         }
     }
 
@@ -79,6 +84,10 @@ impl DocumentFactory {
             DocumentType::Specification => {
                 let spec = Specification::from_content(raw_content)?;
                 Ok(Box::new(spec))
+            }
+            DocumentType::Design => {
+                let design = Design::from_content(raw_content)?;
+                Ok(Box::new(design))
             }
         }
     }
