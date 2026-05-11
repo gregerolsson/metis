@@ -72,7 +72,8 @@ This initiative adds a `design` document type (shortcode `D`) so a project can c
 6. `crates/metis-docs-core/src/domain/documents/design/mod.rs` — new module mirroring `specification/mod.rs` for template loading and type-specific behavior.
 7. `crates/metis-docs-core/src/application/services/document/creation.rs:170-220` — branch for `Design`: require Vision parent, ensure `.metis/designs/` exists, write to `designs/<id>/design.md`.
 8. `crates/metis-docs-mcp/src/tools/create_document.rs:130-220` — handle `document_type="design"` (parent validation, no `backlog_category`).
-9. Update MCP server instructions / preset descriptions emitted at session start to list the `design` type.
+9. `crates/metis-docs-cli/src/commands/create/mod.rs:17-64` and a new `design.rs` sibling — add `metis create design` subcommand mirroring `specification`.
+10. Update MCP server instructions / preset descriptions emitted at session start to list the `design` type.
 
 ### Cross-cutting
 - Search and list tools should work unchanged once the type is registered, but verify SQL filters / type enums don't pin a closed set.

@@ -823,6 +823,7 @@ impl<'a> SyncService<'a> {
                                 "T" => "task",
                                 "A" => "adr",
                                 "S" => "specification",
+                                "D" => "design",
                                 _ => continue,
                             };
 
@@ -890,7 +891,7 @@ impl<'a> SyncService<'a> {
         }
 
         // Type: single letter from allowed set
-        if !matches!(type_letter, "V" | "I" | "T" | "A" | "S") {
+        if !matches!(type_letter, "V" | "I" | "T" | "A" | "S" | "D") {
             return false;
         }
 

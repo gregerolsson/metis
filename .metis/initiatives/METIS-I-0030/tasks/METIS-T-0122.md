@@ -4,14 +4,14 @@ level: task
 title: "End-to-end smoke test for design lifecycle"
 short_code: "METIS-T-0122"
 created_at: 2026-05-08T10:16:19.678862+00:00
-updated_at: 2026-05-08T10:16:19.678862+00:00
+updated_at: 2026-05-11T10:41:38.287574+00:00
 parent: METIS-I-0030
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -54,6 +54,10 @@ The test must exercise these scenarios (one `#[tokio::test]` per scenario, each 
     - Create Design with no `parent_id` → returns the "Design requires a Vision parent" error.
     - Create Design parented to an Initiative short code → returns the "Design parent must be a Vision" error.
     - Transition Design from Approved to any other phase → returns InvalidPhaseTransition error (Approved is terminal except for archive).
+
+## Acceptance Criteria
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

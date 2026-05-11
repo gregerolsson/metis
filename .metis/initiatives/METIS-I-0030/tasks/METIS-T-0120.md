@@ -4,14 +4,14 @@ level: task
 title: "Creation service branch and .metis/designs/ on-disk layout"
 short_code: "METIS-T-0120"
 created_at: 2026-05-08T10:16:17.358861+00:00
-updated_at: 2026-05-08T10:16:17.358861+00:00
+updated_at: 2026-05-11T10:41:37.118978+00:00
 parent: METIS-I-0030
 blocked_by: []
 archived: false
 
 tags:
   - "#task"
-  - "#phase/todo"
+  - "#phase/completed"
 
 
 exit_criteria_met: false
@@ -69,6 +69,10 @@ Add to the `tests` mod in `creation.rs`:
 
 Add to the `tests` mod in `transition.rs`:
 - `test_design_kickback_review_to_discovery`: create Design (Discovery), transition to Review, then explicitly transition back to Discovery; assert phase is Discovery.
+
+## Acceptance Criteria
+
+## Acceptance Criteria
 
 ## Acceptance Criteria
 

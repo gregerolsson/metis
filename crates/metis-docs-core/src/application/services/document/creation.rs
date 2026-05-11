@@ -620,8 +620,8 @@ impl DocumentCreationService {
 
         // Generate short code
         let short_code = self.generate_short_code("design")?;
-        let designs_dir = self.workspace_dir.join("designs").join(&short_code);
-        let file_path = designs_dir.join("design.md");
+        let designs_dir = self.workspace_dir.join("designs");
+        let file_path = designs_dir.join(format!("{}.md", short_code));
 
         if file_path.exists() {
             return Err(MetisError::ValidationFailed {
@@ -1125,7 +1125,7 @@ This is a custom template for testing.
         assert!(result
             .file_path
             .to_string_lossy()
-            .ends_with("design.md"));
+            .ends_with(&format!("{}.md", result.short_code)));
         assert!(result.short_code.contains("-D-"));
 
         // Verify defaults

@@ -115,8 +115,7 @@ async fn test_design_creation_under_vision() -> Result<()> {
 
     let design_path = std::path::Path::new(&metis)
         .join("designs")
-        .join(&design_code)
-        .join("design.md");
+        .join(format!("{}.md", design_code));
     assert!(
         design_path.exists(),
         "expected design at {}",

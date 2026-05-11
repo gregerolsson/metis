@@ -1,4 +1,5 @@
 mod adr;
+mod design;
 mod initiative;
 mod specification;
 mod task;
@@ -36,6 +37,14 @@ pub enum CreateCommands {
         /// ADR title
         title: String,
     },
+    /// Create a new design document
+    Design {
+        /// Design title
+        title: String,
+        /// Parent vision short code (e.g., PROJ-V-0001)
+        #[arg(short, long)]
+        vision: String,
+    },
     /// Create a new specification document
     Specification {
         /// Specification title
@@ -57,6 +66,9 @@ impl CreateCommand {
             }
             CreateCommands::Adr { title } => {
                 adr::create_new_adr(title).await?;
+            }
+            CreateCommands::Design { title, vision } => {
+                design::create_new_design(title, vision).await?;
             }
             CreateCommands::Specification { title, parent } => {
                 specification::create_new_specification(title, parent).await?;

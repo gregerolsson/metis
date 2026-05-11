@@ -273,14 +273,13 @@ impl DocumentDiscoveryService {
                     let entry_path = entry
                         .map_err(|e| MetisError::FileSystem(e.to_string()))?
                         .path();
-                    // Each design lives in its own directory: designs/{SHORT_CODE}/design.md
-                    if entry_path.is_dir() {
-                        let design_path = entry_path.join("design.md");
-                        if design_path.exists() {
-                            if let Ok(design) = Design::from_file(&design_path).await {
-                                if design.id().to_string() == document_id {
-                                    return Ok(design_path);
-                                }
+                    // Each design is a flat file: designs/{SHORT_CODE}.md
+                    if entry_path.is_file()
+                        && entry_path.extension().is_some_and(|ext| ext == "md")
+                    {
+                        if let Ok(design) = Design::from_file(&entry_path).await {
+                            if design.id().to_string() == document_id {
+                                return Ok(entry_path);
                             }
                         }
                     }
@@ -417,11 +416,10 @@ impl DocumentDiscoveryService {
                         let entry_path = entry
                             .map_err(|e| MetisError::FileSystem(e.to_string()))?
                             .path();
-                        if entry_path.is_dir() {
-                            let design_path = entry_path.join("design.md");
-                            if design_path.exists() {
-                                documents.push(design_path);
-                            }
+                        if entry_path.is_file()
+                            && entry_path.extension().is_some_and(|ext| ext == "md")
+                        {
+                            documents.push(entry_path);
                         }
                     }
                 }
@@ -562,8 +560,7 @@ impl DocumentDiscoveryService {
             DocumentType::Design => Ok(self
                 .workspace_dir
                 .join("designs")
-                .join(short_code)
-                .join("design.md")),
+                .join(format!("{}.md", short_code))),
         }
     }
 

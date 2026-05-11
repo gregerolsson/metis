@@ -10,6 +10,7 @@ pub mod status;
 pub mod sync;
 pub mod transition;
 pub mod validate;
+pub mod view;
 
 pub use archive::ArchiveCommand;
 pub use config::ConfigCommand;
@@ -23,3 +24,4 @@ pub use status::StatusCommand;
 pub use sync::SyncCommand;
 pub use transition::TransitionCommand;
 pub use validate::ValidateCommand;
+pub use view::ViewCommand;

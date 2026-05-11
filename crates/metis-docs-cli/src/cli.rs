@@ -5,6 +5,7 @@ use tracing_subscriber::filter::LevelFilter;
 use crate::commands::{
     ArchiveCommand, ConfigCommand, CreateCommand, IndexCommand, InitCommand, ListCommand,
     McpCommand, SearchCommand, StatusCommand, SyncCommand, TransitionCommand, ValidateCommand,
+    ViewCommand,
 };
 
 #[derive(Parser)]
@@ -34,6 +35,8 @@ pub enum Commands {
     Transition(TransitionCommand),
     /// List documents in the workspace
     List(ListCommand),
+    /// Print a document's contents to stdout
+    View(ViewCommand),
     /// Show workspace status and actionable items
     Status(StatusCommand),
     /// Archive completed documents and move them to archived folder
@@ -71,6 +74,7 @@ impl Cli {
             Commands::Search(cmd) => cmd.execute().await,
             Commands::Transition(cmd) => cmd.execute().await,
             Commands::List(cmd) => cmd.execute().await,
+            Commands::View(cmd) => cmd.execute().await,
             Commands::Status(cmd) => cmd.execute().await,
             Commands::Archive(cmd) => cmd.execute().await,
             Commands::Validate(cmd) => cmd.execute().await,
@@ -85,9 +89,10 @@ impl Cli {
 mod tests {
     use super::*;
     use crate::commands::create::CreateCommands;
+    use crate::commands::list::OutputFormat;
     use crate::commands::{
-        ArchiveCommand, CreateCommand, ListCommand, OutputFormat, SearchCommand, StatusCommand,
-        SyncCommand, TransitionCommand, ValidateCommand,
+        ArchiveCommand, CreateCommand, ListCommand, SearchCommand, StatusCommand, SyncCommand,
+        TransitionCommand, ValidateCommand,
     };
     use std::fs;
     use tempfile::tempdir;
